@@ -1,0 +1,657 @@
+МЕТОДИЧКА ПО ЛАБОРАТОРНЫМ РАБОТАМ 1–6
+ПМ.04 Сопровождение и обслуживание программного обеспечения
+Редакция от 16.10.2026. Кодировка UTF-8.
+
+Это краткий порядок выполнения заданий, а не отчет об установленном ПО.
+Команды ниже предназначены для учебной Ubuntu Desktop 24.04 LTS x86_64.
+На компьютере, где подготовлена методичка, установки не выполнялись.
+Общий раздел нужен в каждой работе; затем выполняется раздел своего номера.
+Работайте в отдельной учебной машине или ВМ. sudo — права администратора.
+Строки под заголовком «Код файла» сохраняйте в файл, а не вводите как команды.
+Условные ИМЯ, URL и ХЕШ заменяйте своими значениями. Команды вводите построчно.
+Пакеты из Ubuntu — версии дистрибутива; они могут отличаться от новых выпусков
+разработчика. Если требуется последний stable, используйте официальный
+дистрибутив, проверьте совместимость и запишите фактически установленную версию.
+
+СОСТАВ ПАПКИ
+00 — общая методичка в одном TXT.
+01 — руководство Android Studio для работы 1.
+02 — руководство Postman для работы 2.
+03 — руководство VS Code с Flutter для работы 3.
+04 — руководство Git LFS для работы 4.
+05 — руководство Jenkins для работы 5.
+06 — руководство electron-builder для работы 6.
+Руководства DOCX открываются в LibreOffice Writer через Файл → Открыть.
+При необходимости сохраняйте копию в ODT. Структура руководств соответствует
+подразделу 6.4 ГОСТ Р 59795–2021: введение; назначение и условия применения;
+подготовка; операции; аварийные ситуации; рекомендации по освоению.
+
+1. ОБЩАЯ ПОДГОТОВКА ДЛЯ ЛЮБОЙ РАБОТЫ
+
+1.1. Установка ОС и обновление
+Скачайте ISO Ubuntu с ubuntu.com/download/desktop, проверьте SHA-256 по сайту.
+В ВМ создайте диск от 60 ГБ; для Android и Unity желательно от 100 ГБ и 32 ГБ
+ОЗУ у рабочей станции. Подключите ISO, установите ОС, создайте пользователя.
+В VirtualBox/VMware установите гостевые дополнения; для KVM — guest agent.
+Для Android внутри ВМ требуется вложенная виртуализация; иначе используйте
+физический телефон. Установка ОС на реальный диск стирает выбранные разделы.
+
+cat /etc/os-release                         # название и версия ОС
+uname -r                                   # версия ядра
+lscpu                                      # процессор и виртуализация
+free -h                                    # оперативная память
+lsblk                                      # диски и разделы
+sudo apt update                            # обновить список пакетов
+sudo apt upgrade                           # установить доступные обновления
+sudo reboot                                # перезапуск после обновления ядра
+
+sudo apt install libreoffice gimp p7zip-full htop curl git ca-certificates
+sudo apt install openssh-server ufw fail2ban auditd clamav
+sudo apt install cups cups-pdf timeshift rsync
+sudo apt install mesa-utils vulkan-tools linux-tools-generic
+# Базовое ПО: офис, графика, архиватор, диагностика, печать, защита и копирование.
+
+ubuntu-drivers devices                     # рекомендованные драйверы Ubuntu
+# При наличии подходящего рекомендованного проприетарного драйвера:
+sudo ubuntu-drivers autoinstall
+# После установки драйвера перезагрузитесь; проверьте графику:
+glxinfo -B                                 # сведения о OpenGL и рендерере
+vulkaninfo --summary                       # поддержка Vulkan
+systemctl --failed                         # службы с ошибками
+
+sysctl vm.swappiness                       # текущий параметр ядра
+# Пример контролируемой настройки на учебной станции:
+echo 'vm.swappiness=20' | sudo tee /etc/sysctl.d/60-lab-memory.conf
+sudo sysctl --system                       # применить параметры
+sysctl vm.swappiness                       # проверить значение
+# Значение 20 — пример для стенда, не универсальная оптимизация.
+
+1.2. Сеть и SSH
+ip -br a                                   # интерфейсы и адреса
+ip route                                   # маршрут по умолчанию
+nmcli device status                        # выбрать подключенный интерфейс
+nmcli connection show                      # профили NetworkManager
+# В Настройки → Сеть выберите нужный адаптер и DHCP или выданный статический IP.
+ping -c 3 1.1.1.1                          # проверка маршрутизации, если ICMP разрешен
+getent hosts ubuntu.com                    # проверка DNS
+curl -I https://ubuntu.com                 # проверка HTTPS
+sudo systemctl enable --now ssh
+sudo sshd -t                               # проверка конфигурации SSH
+systemctl status ssh --no-pager
+
+# На другом компьютере под своим пользователем:
+ssh-keygen -t ed25519                       # новый ключ; существующий не перезаписывать
+ssh-copy-id ИМЯ@IP_СЕРВЕРА                  # установить открытый ключ
+ssh ИМЯ@IP_СЕРВЕРА                         # проверить вход
+# После проверки ключа администратор создает
+# /etc/ssh/sshd_config.d/60-lab.conf со строками:
+# PermitRootLogin no
+# PubkeyAuthentication yes
+# PasswordAuthentication no
+sudo sshd -t
+sudo systemctl reload ssh
+# Сохраните исходный сеанс до проверки второго подключения по ключу.
+
+sudo ufw default deny incoming
+sudo ufw default allow outgoing
+# Замените адрес на IP доверенного компьютера; команду выполните до enable:
+sudo ufw allow from 192.168.56.1 to any port 22 proto tcp
+sudo ufw enable
+sudo ufw status verbose
+# 192.168.56.1 — пример, а не обязательный адрес вашего стенда.
+
+1.3. Удаленный доступ к текущему рабочему столу
+Ubuntu: Настройки → Система → Удаленный рабочий стол → Общий доступ к рабочему
+столу (Desktop Sharing), включите управление и задайте отдельный пароль RDP.
+Используйте порт, показанный настройками. Desktop Sharing подключает к текущему
+сеансу; Remote Login может создавать другой сеанс и не заменяет эту проверку.
+Разрешите показанный порт в UFW только с IP проверяющего компьютера. Например:
+sudo ufw allow from 192.168.56.1 to any port 3389 proto tcp
+# Подключитесь RDP клиентом и покажите движение окна в уже открытом сеансе.
+# Если выбран иной порт, измените правило. Не настраивайте проброс в интернет.
+
+1.4. Виртуальный принтер
+sudo systemctl enable --now cups
+lpstat -p -d                               # очереди и принтер по умолчанию
+# В Настройки → Принтеры добавьте CUPS-PDF, если очередь не создалась автоматически.
+# В Writer напишите строку «Проверка печати», отправьте на CUPS-PDF.
+# Найдите созданный PDF, обычно в ~/PDF, и откройте его. Не ограничивайтесь
+# «Экспорт в PDF»: в задании требуется именно виртуальный принтер.
+
+1.5. Пользователи, группы и права
+sudo groupadd -f developers
+sudo adduser labuser                       # задать пароль интерактивно
+sudo usermod -aG developers labuser
+sudo install -d -m 2770 -o root -g developers /srv/lab-projects
+id labuser
+ls -ld /srv/lab-projects
+# 2770: полный доступ владельцу и группе; остальным доступа нет;
+# setgid сохраняет группу у новых файлов. Членство применяется после нового входа.
+sudo -u labuser touch /srv/lab-projects/access-ok
+# Для проверки отказа создайте отдельного обычного пользователя без developers
+# и попробуйте открыть /srv/lab-projects из его сеанса. Не выдавайте sudo всем.
+
+1.6. Антивирус, контроль входов и аудит
+sudo systemctl stop clamav-freshclam
+sudo freshclam                             # обновить антивирусные базы
+sudo systemctl start clamav-freshclam
+clamscan -r --infected "$HOME/Downloads"    # проверка загрузок, без удаления файлов
+# Если базы недоступны, проверьте сеть; без них проверка не считается полноценной.
+
+# Сохраните в /etc/fail2ban/jail.d/lab-sshd.local:
+# [sshd]
+# enabled = true
+# backend = systemd
+# maxretry = 5
+sudo systemctl enable --now fail2ban
+sudo systemctl restart fail2ban
+sudo fail2ban-client status sshd
+sudo systemctl enable --now auditd
+# Сохраните в /etc/audit/rules.d/lab-projects.rules:
+# -w /srv/lab-projects -p wa -k lab_projects
+sudo augenrules --load
+sudo -u labuser touch /srv/lab-projects/audit-check
+sudo ausearch -k lab_projects -i            # события изменения общих ресурсов
+sudo journalctl -u ssh -n 20 --no-pager     # журнал SSH
+sudo journalctl -k -n 20 --no-pager         # события ядра
+sudo ss -tulpn                             # открытые порты и процессы
+# Антивирус, UFW и Fail2ban выполняют разные задачи; защиты от абсолютно всех
+# атак не существует. Проверяйте обновления, источники файлов и минимальные права.
+
+1.7. Резервное копирование, восстановление и установочный образ
+Timeshift: запустите sudo timeshift-gtk, выберите RSYNC и отдельный исправный
+носитель, создайте снимок до установки ПО и после успешной настройки.
+sudo timeshift --list                      # список точек восстановления
+# По умолчанию Timeshift не сохраняет личные файлы — их копируйте отдельно.
+# Подключите внешний диск, проверьте точку монтирования через lsblk.
+# Пример после замены пути к диску:
+rsync -a --info=progress2 "$HOME/Projects/" /media/ИМЯ/ДИСК/backup/Projects/
+# Не используйте --delete; проверьте открытие нескольких файлов с копии.
+
+Полный образ установленной ОС: загрузите Clonezilla Live, выберите
+ device-image → local_dev → внешний накопитель → savedisk.
+Проверьте имя исходного диска и место назначения. Включите проверку образа.
+Восстановление сначала испытайте на пустой тестовой ВМ, а не на исходном диске.
+Образ Clonezilla — резервная копия диска, он не является установочным ISO.
+
+Установочный ISO с настройками: на отдельном учебном стенде используйте Cubic.
+Получите Cubic из официального проекта github.com/PJ-Singh-001/Cubic, выберите базовый
+Ubuntu ISO, создайте проект, в chroot установите нужные пакеты, завершите мастер
+генерации. Не включайте личные ключи и учетные записи. Уточните совместимость
+Cubic с исходным выпуском Ubuntu. Проверьте полученный ISO в новой ВМ: загрузка,
+запуск установщика, успешная установка, наличие пакетов. Сохраните SHA-256:
+sha256sum ПУТЬ_К_ГОТОВОМУ_ISO
+# Исходный ISO Ubuntu дает установщик; снимок Timeshift дает откат;
+# Clonezilla дает образ диска; Cubic дает собственный установочный ISO.
+
+1.8. Совместимость интерфейса
+Проверьте меню, диалоги, кнопки, кириллицу и печать. В Настройки → Дисплеи
+выберите поддерживаемое низкое разрешение и масштаб 100 %, повторите проверку,
+затем верните удобные параметры. Зафиксируйте результат скриншотами.
+GNOME Wayland не предоставляет штатного отключения композитора. Для отдельной
+проверки этого пункта можно установить Xfce и войти в сеанс Xfce:
+sudo apt install xfce4
+# После входа в Xfce:
+xfconf-query -c xfwm4 -p /general/use_compositing -s false
+# Обратно включить: заменить false на true.
+# Для старых X11 приложений с ограниченной палитрой возможен отдельный стенд:
+sudo apt install xvfb xterm
+Xvfb :99 -screen 0 1024x768x8 &
+DISPLAY=:99 xterm &
+# Этот экран невидим без клиента просмотра; для демонстрации подключите
+# x11vnc к :99 или согласуйте снимок экрана X11. Современные IDE часто требуют
+# 24-битный цвет: не заявляйте их поддержку 8-битной палитры без проверки.
+# При несовместимости зафиксируйте ограничение и используйте поддерживаемый режим.
+
+2. РАБОТА 1 — РАЗРАБОТКА ANDROID
+
+Выбор: Android Studio — Android; Code::Blocks + GNU GCC — среда с набором
+компиляторов; Mesa llvmpipe — программный рендеринг 3D; QEMU/KVM — гостевые ОС.
+Фраза про «измененный набор компиляторов» неоднозначна: Code::Blocks использует
+GCC, но сам не является измененной версией GCC. Если преподаватель имеет в виду
+конкретную среду, сверяйте ее с выданными дистрибутивами. Для собственно Android
+основной комплект — Android Studio и SDK/NDK, где NDK использует LLVM/Clang.
+Защита: общие UFW, Fail2ban, обновления, ClamAV и минимальные права.
+
+sudo apt install codeblocks build-essential gdb qemu-kvm qemu-system-x86
+sudo apt install virt-manager libvirt-daemon-system libvirt-clients
+sudo apt install libgl1-mesa-dri mesa-utils
+sudo usermod -aG kvm,libvirt "$USER"         # войдите заново после изменения
+sudo systemctl enable --now libvirtd
+codeblocks                                 # создать Console application → Build and run
+LIBGL_ALWAYS_SOFTWARE=1 glxinfo -B           # ожидается программный renderer llvmpipe
+LIBGL_ALWAYS_SOFTWARE=1 glxgears             # проверить отображение 3D
+virt-manager                               # создать гостевую ВМ из ISO и запустить
+# QEMU показывает другую ОС; llvmpipe показывает программную 3D графику.
+
+Android Studio: скачайте официальный архив с developer.android.com/studio.
+Распакуйте в ~/opt; откройте android-studio/bin и выполните ./studio.sh.
+Мастер → Standard; SDK Manager → SDK Platform, Build Tools, Platform Tools,
+Emulator и Command-line Tools. При необходимости установите NDK и CMake.
+Device Manager → телефон → совместимый образ → LabPhone → запуск.
+New Project → Empty Activity → Kotlin → LabMobile → дождаться Gradle Sync.
+Run → LabPhone: приложение должно открыться.
+# В корне проекта:
+chmod +x gradlew
+./gradlew assembleDebug
+ls -lh app/build/outputs/apk/debug/app-debug.apk
+sha256sum app/build/outputs/apk/debug/app-debug.apk
+# Показать: приложение, APK, Code::Blocks, llvmpipe, гостевую ОС и защиту.
+# Документ: 01 Руководство пользователя Android Studio.docx.
+
+3. РАБОТА 2 — ВЕБ СЕРВИСЫ И API
+
+Выбор: VS Code с Python, Pylance, JavaScript/TypeScript, PostgreSQL расширением
+и REST Client — редактор с поддержкой Django/Node.js, SQL и REST; Git + gitk —
+распределенные версии с графическим просмотром; PostgreSQL — локальная СУБД;
+Postman — тестирование API; UFW/Fail2ban + TLS + Wireshark — защита и наблюдение.
+Для встроенного Node.js отладчика используйте поддерживаемую Node.js LTS.
+
+sudo snap install code --classic
+sudo snap install postman
+sudo apt install python3-venv python3-pip postgresql git gitk wireshark
+code --install-extension ms-python.python
+code --install-extension ms-python.vscode-pylance
+code --install-extension cweijan.vscode-postgresql-client2
+code --install-extension humao.rest-client
+# Расширения ставьте только после проверки издателя и разрешений.
+sudo systemctl enable --now postgresql
+sudo -u postgres psql -c 'SELECT version();'
+# Создайте учебную БД через psql; пароль задавайте интерактивно командой \password.
+# В SQL расширении подключитесь к localhost и покажите SELECT 1.
+# Установите Node.js LTS с nodejs.org, проверьте совместимость с проектом:
+node --version
+npm --version
+mkdir -p ~/Projects/web-lab
+cd ~/Projects/web-lab
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install Django
+django-admin startproject labsite .
+python manage.py migrate
+python manage.py runserver 127.0.0.1:8001
+# В другом терминале: curl -I http://127.0.0.1:8001
+# В каталоге проекта: git init, настройте свои user.name/email; откройте gitk.
+# Wireshark: захватывайте только свой учебный трафик; выберите loopback для API.
+# Для реальных удаленных сервисов используйте TLS, доверенные сертификаты,
+# ключи SSH и VPN при необходимости. Локальный HTTP ниже — только loopback.
+
+Код файла api_lab.py (сохранить в ~/Projects/api-lab):
+--- НАЧАЛО PYTHON ---
+from http.server import BaseHTTPRequestHandler, HTTPServer
+import json
+
+class Handler(BaseHTTPRequestHandler):
+    def reply(self, status, data):
+        body = json.dumps(data).encode('utf-8')
+        self.send_response(status)
+        self.send_header('Content-Type', 'application/json; charset=utf-8')
+        self.send_header('Content-Length', str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def do_GET(self):
+        if self.path == '/health':
+            self.reply(200, {'status': 'ok'})
+        else:
+            self.reply(404, {'error': 'not found'})
+
+    def do_POST(self):
+        if self.path != '/echo':
+            self.reply(404, {'error': 'not found'})
+            return
+        try:
+            size = int(self.headers.get('Content-Length', '0'))
+            if not 0 < size <= 65536:
+                self.reply(400, {'error': 'invalid size'})
+                return
+            data = json.loads(self.rfile.read(size))
+        except (ValueError, UnicodeDecodeError):
+            self.reply(400, {'error': 'invalid JSON'})
+            return
+        self.reply(200, data)
+
+HTTPServer(('127.0.0.1', 8000), Handler).serve_forever()
+--- КОНЕЦ PYTHON ---
+
+cd ~/Projects/api-lab
+python3 api_lab.py                          # оставить запущенным; Ctrl+C завершает
+# В другом терминале:
+curl -i http://127.0.0.1:8000/health
+curl -i -H 'Content-Type: application/json' -d '{"task":2}' http://127.0.0.1:8000/echo
+# Postman: Local → base_url=http://127.0.0.1:8000; коллекция LabAPI.
+# Health: GET {{base_url}}/health. Echo: POST {{base_url}}/echo, Body raw JSON.
+# Для Health в Scripts → Post-response:
+pm.test('HTTP 200', () => pm.response.to.have.status(200));
+pm.test('Ready', () => pm.expect(pm.response.json().status).to.eql('ok'));
+# Run collection → 1 итерация → все тесты Passed; Export коллекции и окружения.
+# Показать: SQL запрос, Django страницу, Node.js, Git GUI, Postman и журнал сети.
+# Документ: 02 Руководство пользователя Postman.docx.
+
+4. РАБОТА 3 — FLUTTER И DART
+
+Выбор: VS Code + Flutter/Dart — мобильная разработка из одной кодовой базы;
+Flutter SDK — компиляторы и инструменты; Android Emulator — разные экраны/ОС;
+Penpot — визуальное проектирование макетов; ClamAV + UFW — защита станции.
+В Linux возможна разработка Android. Для сборки iOS необходим macOS и Xcode.
+
+sudo apt install curl git unzip xz-utils zip libglu1-mesa
+sudo snap install code --classic            # если еще не установлен
+code --install-extension Dart-Code.flutter
+# Ctrl+Shift+P → Flutter: New Project → Download SDK → ~/sdk → Clone Flutter.
+# Add SDK to PATH; перезапустите редактор и терминал. Используйте stable.
+flutter channel stable
+flutter upgrade
+flutter --version
+flutter doctor -v
+flutter doctor --android-licenses
+# Исправьте Android toolchain, запустите AVD через Android Studio.
+flutter devices
+mkdir -p ~/Projects
+cd ~/Projects
+flutter create lab_flutter
+cd lab_flutter
+code .
+# Выберите Android устройство → F5. В main.dart измените заголовок, сохраните,
+# выполните Flutter: Hot Reload. Проверьте изменение и работу счетчика.
+flutter analyze
+flutter test
+flutter build apk --debug
+ls -lh build/app/outputs/flutter-apk/app-debug.apk
+# Penpot: откройте penpot.app, создайте учебный проект и фрейм телефона,
+# добавьте кнопку/текст, настройте переход в прототипе, экспортируйте SVG/PNG.
+# Макет Penpot не становится Flutter кодом автоматически; перенесите структуру
+# в виджеты вручную. Для локального Penpot используйте официальный Compose.
+# Показать: doctor, две конфигурации AVD, работающий Flutter, макет и APK.
+# Документ: 03 Руководство пользователя VS Code с Flutter.docx.
+
+5. РАБОТА 4 — 3D ИГРЫ И АССЕТЫ
+
+Выбор: Unity 6 + внешний VS Code с C# — игровой движок и редактирование кода;
+Vulkan через драйвер GPU — 3D API; Blender — модели/анимация/текстуры;
+Git + Git LFS + gitk — история проектов и крупных ресурсов.
+Unity включает редактор игрового проекта; исходники C# редактируются внешней
+средой. Для консольных сборок нужны лицензии и SDK правообладателей.
+Защита от сетевых атак: обновления, UFW, Fail2ban, AppArmor; проверка зависимостей.
+Это не заменяет защиту серверной логики онлайн игры.
+
+sudo apt install blender git git-lfs gitk vulkan-tools mesa-utils
+sudo aa-status                             # состояние профилей AppArmor
+vulkaninfo --summary
+# Unity Hub: получить официальный пакет на unity.com/download;
+# установить Hub → совместимый стабильный Unity 6 → необходимые модули.
+# Ubuntu 24.04 поддерживается Unity 6; сверяйте требования выбранного выпуска.
+# Создать 3D проект AssetLab. External Tools → External Script Editor → VS Code.
+# Установить расширения C# от Microsoft и Unity от проверенного издателя.
+# В Player Settings проверьте Graphics API Vulkan при поддержке GPU.
+# В Blender создать куб, сохранить Assets/Models/cube.blend.
+# Unity: Visible Meta Files, сериализация Force Text при наличии настроек.
+
+cd ~/Projects/AssetLab
+git init -b main
+git lfs install --local
+git config user.name 'ВАШЕ ИМЯ'
+git config user.email 'ВАШ_EMAIL'
+# В .gitignore (Код файла):
+# Library/
+# Temp/
+# Obj/
+# Logs/
+# UserSettings/
+# Build/
+git lfs track '*.blend'
+git lfs track '*.fbx'
+git lfs track '*.png'
+git add .gitattributes .gitignore Assets Packages ProjectSettings
+git diff --cached --stat
+git commit -m 'Add initial assets'
+git lfs ls-files                            # модель должна быть в списке
+git switch -c asset/cube
+# Измените модель, сохраните, затем добавьте измененные файлы и сделайте коммит.
+gitk --all                                 # графическая история
+# Для обмена администратор выдает настоящий URL сервера с LFS:
+git remote add origin URL_РЕПОЗИТОРИЯ
+git push -u origin main
+git push -u origin asset/cube
+git clone URL_РЕПОЗИТОРИЯ ~/Projects/AssetLabCopy
+cd ~/Projects/AssetLabCopy
+git lfs pull
+# Нужна настоящая модель, не указатель version https://git-lfs.github.com/spec/v1.
+# Не сохраняйте Library в Git. Для двоичных конфликтов выбирайте согласованную
+# версию; блокировка git lfs lock доступна только при поддержке сервера.
+# Показать: Unity Play, API/драйвер, модель Blender, два коммита, копию с LFS.
+# Документ: 04 Руководство пользователя Git LFS.docx.
+
+6. РАБОТА 5 — DEVOPS И CI/CD
+
+Выбор: VS Code с Python, Go, Rust и YAML; Jenkins LTS — CI/CD;
+Docker Engine — контейнеры; Prometheus + Grafana — мониторинг;
+Keycloak — централизованная аутентификация; права Jenkins — авторизация;
+Audit Trail/auditd — аудит; UFW — периметр. Нужны настройки, одного запуска мало.
+
+sudo snap install code --classic
+code --install-extension ms-python.python
+code --install-extension golang.Go
+code --install-extension rust-lang.rust-analyzer
+code --install-extension redhat.vscode-yaml
+# Bash/JSON поддерживаются редактором; дополнительные расширения — по задаче.
+# Docker Engine установите из официального репозитория по docs.docker.com/engine/
+# install/ubuntu/. Пакет docker.io из Ubuntu может отставать от stable Docker CE.
+sudo systemctl enable --now docker
+sudo docker run --rm hello-world
+sudo docker volume create jenkins_home
+sudo docker pull jenkins/jenkins:lts-jdk21
+sudo docker run -d --name jenkins-lab --restart unless-stopped -p 127.0.0.1:8080:8080 -v jenkins_home:/var/jenkins_home jenkins/jenkins:lts-jdk21
+sudo docker exec jenkins-lab cat /var/jenkins_home/secrets/initialAdminPassword
+# Пароль открывайте только локально; не помещайте его в отчет или скриншот.
+# Браузер → http://127.0.0.1:8080 → мастер → рекомендуемые плагины → администратор.
+# Установите Pipeline, Matrix Authorization Strategy, Audit Trail;
+# Configure System → Audit Trail: настройте файл журналов в сохраняемом томе.
+# Security → проверенная матрица прав. Сохраните администратору Overall/Administer;
+# Anonymous — без доступа. Для лабораторной дайте права на учебные задания.
+# Для стенда проверьте 1 executor контроллера; рабочим сборкам выделите агент.
+# В Jenkins: New Item → LabPipeline → Pipeline → Pipeline script.
+
+Код Pipeline:
+--- НАЧАЛО GROOVY ---
+pipeline {
+  agent any
+  options { timeout(time: 3, unit: 'MINUTES') }
+  stages {
+    stage('Build') {
+      steps { writeFile file: 'result.txt', text: 'build ok\n' }
+    }
+    stage('Test') {
+      steps { sh 'test -s result.txt' }
+    }
+    stage('Package') {
+      steps {
+        archiveArtifacts artifacts: 'result.txt', fingerprint: true
+      }
+    }
+  }
+}
+--- КОНЕЦ GROOVY ---
+# Save → Build Now → Console Output: SUCCESS → Artifacts: result.txt.
+# Это минимальная проверка CI; выпуск в production в нее не входит.
+# Для имитации развертывания добавьте отдельную стадию, копирующую проверенный
+# артефакт в учебный каталог. Для реального CD нужны целевая среда, credentials,
+# проверка работоспособности и возможность отката.
+# Не передавайте Docker socket контроллеру Jenkins: он дает власть над хостом.
+
+Мониторинг — простой локальный вариант:
+sudo apt install prometheus prometheus-node-exporter
+sudo systemctl enable --now prometheus-node-exporter prometheus
+# В /etc/prometheus/prometheus.yml добавьте scrape job (не дублируйте scrape_configs):
+#   - job_name: node
+#     static_configs:
+#       - targets: ['localhost:9100']
+sudo systemctl restart prometheus
+# http://127.0.0.1:9090/targets → node UP; запрос up{job="node"} возвращает 1.
+# Grafana установите по официальной инструкции grafana.com/docs/grafana/latest/
+# setup-grafana/installation/debian/. Откройте localhost:3000, смените начальный
+# пароль, добавьте Prometheus URL http://127.0.0.1:9090 и панель CPU/RAM.
+# Prometheus/Grafana ограничьте loopback или закрытой сетью; проверьте ss -tulpn.
+
+Централизованная безопасность — настройка в интерфейсе:
+1) Разверните Keycloak по официальной инструкции, создайте realm lab.
+2) Создайте пользователя и группу devops; client jenkins — confidential,
+   Standard Flow включен. Client secret храните только в настройках интеграции.
+3) В Jenkins установите совместимый OpenID Connect Authentication plugin.
+   В Security укажите discovery URL realm, client ID, secret и точный callback
+   URL, показанный плагином. Добавьте этот callback в разрешенные redirects.
+4) Настройте сопоставление имен/групп и матрицу прав. Проверьте вход через
+   Keycloak и отказ в административных действиях обычному пользователю.
+5) До смены способа входа подготовьте резервную копию и локальный способ
+   восстановления администратора. В рабочей системе используйте HTTPS.
+6) Включите аудит Keycloak events и Jenkins Audit Trail. Покажите одно событие
+   входа и одно изменение задания. auditd ведет аудит ОС, он не заменяет SSO.
+# Показать: SUCCESS и FAILURE, артефакт, контейнеры, target UP, график,
+# SSO вход, запрет лишних прав и запись аудита.
+# Документ: 05 Руководство пользователя Jenkins.docx.
+
+7. РАБОТА 6 — ELECTRON И УСТАНОВЩИКИ
+
+Выбор: VS Code — JS/TS; Node.js и Electron — выполнение и настольное окно;
+TypeScript — компиляция TS; electron-builder — автоматизация упаковки;
+NSIS — мастер установки Windows, вызываемый electron-builder;
+DEB — установка Linux, DMG — доставка приложения macOS.
+Защита: Firefox/Chrome со встроенной защитой от фишинга и KeePassXC — пароли.
+Для Windows дополнительно встроенный Defender/SmartScreen, для macOS — Gatekeeper.
+
+Установите совместимую Node.js LTS с nodejs.org. Для каждой ОС используйте свой
+дистрибутив Node.js и VS Code. Сборку и проверку проводите на целевой ОС.
+Пример ниже использует JavaScript, TypeScript можно добавить отдельно.
+node --version
+npm --version
+mkdir lab-desktop
+cd lab-desktop
+# Сохраните в этом каталоге три файла ниже.
+
+Код файла package.json:
+--- НАЧАЛО JSON ---
+{
+  "name": "lab-desktop",
+  "version": "1.0.0",
+  "description": "Учебное настольное приложение",
+  "author": { "name": "Student", "email": "student@example.org" },
+  "main": "main.js",
+  "scripts": { "start": "electron .", "dist": "electron-builder" },
+  "build": {
+    "appId": "org.example.labdesktop",
+    "productName": "LabDesktop",
+    "files": ["main.js", "index.html", "package.json"],
+    "directories": { "output": "dist" },
+    "linux": { "target": ["deb"], "category": "Utility" },
+    "win": { "target": ["nsis"] },
+    "mac": { "target": ["dmg"] },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true
+    }
+  }
+}
+--- КОНЕЦ JSON ---
+# Student и student@example.org — условные данные. Перед сборкой для сдачи
+# укажите свое имя и действующий email; адрес требуется упаковщику DEB.
+
+Код файла main.js:
+--- НАЧАЛО JAVASCRIPT ---
+const { app, BrowserWindow } = require('electron');
+function createWindow() {
+  const win = new BrowserWindow({
+    width: 800, height: 600,
+    webPreferences: { nodeIntegration: false, contextIsolation: true }
+  });
+  win.loadFile('index.html');
+}
+app.whenReady().then(() => {
+  createWindow();
+  app.on('activate', () => {
+    if (BrowserWindow.getAllWindows().length === 0) createWindow();
+  });
+});
+app.on('window-all-closed', () => {
+  if (process.platform !== 'darwin') app.quit();
+});
+--- КОНЕЦ JAVASCRIPT ---
+
+Код файла index.html:
+--- НАЧАЛО HTML ---
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'">
+  <title>LabDesktop</title>
+</head>
+<body><h1>Лабораторная работа 6</h1></body>
+</html>
+--- КОНЕЦ HTML ---
+
+npm install --save-dev --save-exact electron electron-builder@26
+npm start                                  # окно с заголовком, затем закрыть
+npm ls --depth=0                           # зафиксировать версии
+# На Ubuntu:
+npx electron-builder --linux deb
+ls -lh dist
+sudo apt install ./dist/ИМЯ_ПАКЕТА.deb       # подставьте фактическое имя
+sha256sum dist/ИМЯ_ПАКЕТА.deb
+sudo apt remove lab-desktop                 # после проверки запуска
+# На Windows:
+npx electron-builder --win nsis
+# На macOS:
+npx electron-builder --mac dmg
+# При необходимости укажите --x64 либо --arm64 для целевой архитектуры.
+# EXE проверьте мастером установки/удаления, DMG — переносом в Applications.
+# macOS пакеты собирайте на Mac. Нативные зависимости требуют подходящего
+# toolchain; выпуск Windows/macOS требует подписи, macOS — нотариализации.
+# Системную защиту ради запуска неизвестного пакета не отключайте.
+# Повторная установка зависимостей: npm ci с сохраненным package-lock.json.
+# Для TypeScript: npm install --save-dev typescript; затем npx tsc --init,
+# настройка исходников, компиляция npx tsc и main с путем к готовому JS.
+
+sudo apt install keepassxc                  # Linux; для Windows/macOS — официальный пакет
+# KeePassXC: создайте базу с сильной мастер-фразой, отдельные записи для сервисов,
+# закройте базу и проверьте повторное открытие. Храните резервную копию базы.
+# В браузере включите защиту от опасных/обманных сайтов; сверяйте домен перед
+# вводом пароля. Не демонстрируйте защиту на реальных вредоносных страницах.
+# Показать: редактор, npm start, установщик, запуск после установки, удаление,
+# SHA-256, включенную защиту браузера и заблокированную базу KeePassXC.
+# Документ: 06 Руководство пользователя electron builder.docx.
+
+8. КРАТКИЙ ПОРЯДОК ДЕМОНСТРАЦИИ И ОЦЕНКИ
+
+Общее для всех шести: ОС/ядро/драйвер; выбранный сетевой интерфейс и HTTPS;
+SSH по ключу; управление текущим сеансом; базовое ПО; CUPS-PDF;
+снимки Timeshift; проверенная внешняя копия; образ Clonezilla и установочный ISO;
+группы, разрешенный и запрещенный доступ; антивирус/периметр/журналы;
+приложение по заданию; тест результата; совместимость; руководство пользователя.
+Фиксируйте только реально выполненные проверки. Не выдавайте пример команды
+или наличие установленного пакета за доказательство настроенной функции.
+
+Ориентир на 80 минут при заранее подготовленных ISO, SDK и кэше пакетов:
+0–15 мин — ОС, обновления, драйверы; 15–25 — сеть, SSH, общий доступ;
+25–40 — программы варианта и базовое ПО; 40–55 — защита, права и аудит;
+55–65 — резервные копии и снимки; 65–75 — контрольный пример и совместимость;
+75–80 — проверка документов и демонстрация. Загрузка больших SDK и создание
+полного образа могут занять больше времени; подготовьте ресурсы заранее.
+
+ОФИЦИАЛЬНЫЕ И СПРАВОЧНЫЕ МАТЕРИАЛЫ
+ГОСТ Р 59795–2021, подраздел 6.4:
+https://allgosts.ru/35/240/gost_r_59795-2021
+Ubuntu: https://documentation.ubuntu.com/server/
+Android: https://developer.android.com/studio/install
+Mesa llvmpipe: https://docs.mesa3d.org/drivers/llvmpipe.html
+Postman: https://learning.postman.com/docs/getting-started/installation/install-app/
+Flutter: https://docs.flutter.dev/install/with-vs-code
+Unity: https://docs.unity3d.com/6000.0/Documentation/Manual/system-requirements.html
+Git LFS: https://git-lfs.com/
+Docker: https://docs.docker.com/engine/install/ubuntu/
+Jenkins: https://www.jenkins.io/doc/book/installing/docker/
+Prometheus: https://prometheus.io/docs/
+Grafana: https://grafana.com/docs/grafana/latest/
+Keycloak: https://www.keycloak.org/getting-started/
+electron-builder 26: https://www.electron.build/v26/docs/cli/
+KeePassXC: https://keepassxc.org/

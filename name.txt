@@ -1,0 +1,183 @@
+# ==============================================================================
+# 🛠️ Общий блок команд (нужен для каждого билета)
+# ==============================================================================
+
+# просто пакет приложений
+sudo apt install libreoffice gimp p7zip-full -y 
+
+# настройка ядра
+sysctl -a
+sysctl -p --system
+
+# 1. SSH и удаленный доступ
+sudo apt update
+sudo apt install openssh-server x11vnc -y
+sudo systemctl enable --now ssh
+
+# 2. Сеть
+ip a
+ping -c 3 google.com
+
+# 3. Виртуальный принтер
+sudo apt install cups printer-driver-cups-pdf -y
+sudo systemctl enable --now cups
+
+# 4. Бэкап системы
+sudo apt install timeshift -y
+sudo timeshift --create --comments "Backup" --yes
+
+# 5. Создание группы и пользователя (пароль будет просто daun1daun2)
+sudo groupadd developers
+sudo useradd -m -g developers exam_user
+echo "exam_user:daun1daun2" | sudo chpasswd
+sudo mkdir -p /opt/project_data
+sudo chown root:developers /opt/project_data
+sudo chmod 770 /opt/project_data
+
+# 6. Обоснование и проверка параметров ядра (Пункт: "настройка параметров ОС и служб")
+# Принудительно обновляем конфигурацию sysctl, чтобы зафиксировать изменения в ядре
+sudo sysctl -p --system
+
+# 7. Настройка журнала мониторинга и аудита (Пункт: "журнал мониторинга настроен")
+# По умолчанию аудит установлен, но служба может быть выключена. Включаем её:
+sudo apt install auditd -y
+sudo systemctl enable --now auditd
+
+# 8. Демонстрация работы принтера (Пункт: "установлен виртуальный принтер")
+# Команда, которая выведет список принтеров и докажет прелоду, что PDF-принтер виден в системе
+lpstat -p -d
+
+# 9. Исправление масштабирования интерфейса (Пункт: "параметры совместимости ПО")
+# Если на экзаменационном компе GUI-программы (Postman, VS Code) сожмутся или поплывут кнопки,
+# вбей эти строки в терминал перед запуском софта, это отключит кривое масштабирование:
+export QT_AUTO_SCREEN_SCALE_FACTOR=0
+export GDK_SCALE=1
+
+
+
+# ==============================================================================
+# 📦 Специфичные команды установки для каждого файла
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# Лабораторная работа 1: Разработка мобильных приложений (Android)
+# ------------------------------------------------------------------------------
+# 1. Обновление системы
+sudo apt update && sudo apt upgrade -y
+
+# 2. Установка компиляторов
+sudo apt install build-essential clang -y
+
+# 3. Установка Android Studio
+sudo snap install android-studio --classic
+
+# 4. Настройка эмулятора
+sudo apt install qemu-system-x86 libvirt-daemon-system libvirt-clients -y
+sudo adduser $USER kvm
+
+# 5. Обеспечение безопасности
+sudo apt install clamav ufw -y
+sudo ufw --force enable
+clamscan -r /home
+
+
+# ------------------------------------------------------------------------------
+# Лабораторная работа 2: Высоконагруженные веб-сервисы (Backend)
+# ------------------------------------------------------------------------------
+# 1. Среда разработки
+sudo snap install code --classic
+
+# 2. Установка Git и интерфейса
+sudo apt install git gitg -y
+
+# 3. Локальный сервер баз данных
+sudo apt install postgresql postgresql-contrib -y
+sudo systemctl enable --now postgresql
+
+# 4. Инструмент для тестирования API
+sudo snap install postman
+
+# 5. Мониторинг сети
+sudo apt install fail2ban wireshark -y
+
+
+# ------------------------------------------------------------------------------
+# Лабораторная работа 3: Кроссплатформенная мобильная разработка (Flutter)
+# ------------------------------------------------------------------------------
+# 1. Базовые зависимости
+sudo apt install curl git unzip xz-utils zip libglu1-mesa -y
+
+# 2. Установка Flutter SDK
+sudo snap install flutter --classic
+
+# 3. Интегрированная среда разработки
+sudo snap install android-studio --classic
+
+# 4. Графика
+sudo apt install inkscape -y
+
+# 5. Защита
+sudo apt install ufw fail2ban -y
+sudo ufw --force enable
+
+
+# ------------------------------------------------------------------------------
+# Лабораторная работа 4: Разработка 3D-игр (GameDev)
+# ------------------------------------------------------------------------------
+# 1. Графический API
+sudo apt install mesa-vulkan-drivers vulkan-tools -y
+
+# 2. Программа для 3D моделей
+sudo snap install blender --classic
+
+# 3. Игровой движок
+sudo snap install unityhub
+
+# 4. Управление ассетами
+sudo apt install git-lfs -y
+git lfs install
+
+# 5. Защита от сетевых атак
+sudo apt install iptables-persistent -y
+sudo ufw --force enable
+
+
+# ------------------------------------------------------------------------------
+# Лабораторная работа 5: DevOps инфраструктура (Сборка и развертывание)
+# ------------------------------------------------------------------------------
+# 1. Редактор кода
+sudo snap install code --classic
+
+# 2. Инструмент контейнеризации
+sudo apt install docker.io docker-compose -y
+sudo systemctl enable --now docker
+sudo usermod -aG docker $USER
+
+# 3. Платформа CI/CD (Запуск Jenkins через Docker)
+sudo docker run -d -p 8080:8080 --name jenkins --restart=always jenkins/jenkins:lts
+
+# 4. Система мониторинга серверов
+sudo apt install prometheus-node-exporter -y
+
+# 5. Централизованное управление безопасностью и аудит
+sudo apt install auditd -y
+sudo systemctl enable --now auditd
+
+
+# ------------------------------------------------------------------------------
+# Лабораторная работа 6: Кросс-платформенные настольные приложения (Desktop)
+# ------------------------------------------------------------------------------
+# 1. Среда разработки
+sudo snap install code --classic
+
+# 2. Среда выполнения веб-технологий
+sudo apt install nodejs npm -y
+
+# 3. Инструмент для сборки
+sudo npm install -g electron electron-builder --unsafe-perm=true --allow-root
+
+# 4. Программа для создания установочных пакетов
+sudo apt install devscripts debhelper dpkg-dev -y
+
+# 5. Безопасное хранение учетных данных
+sudo snap install keepassxc
